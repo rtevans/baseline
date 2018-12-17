@@ -6,14 +6,22 @@
 #include <ev.h>
 
 static int ctr = 0;
+static int FLAG = 1;
 static  char *path = "test.txt";
 
 static void signal_cb(EV_P_ ev_signal *sigterm, int revents)
 {
   ev_break (EV_A_ EVBREAK_ALL);
+  FLAG = 0;
 }
 
 static void timer_cb(struct ev_loop *loop, ev_timer *w, int revents) 
+{
+  ev_break (EV_A_ EVBREAK_ALL);
+  FLAG = 0;
+}
+
+static void rw() 
 {
   int fd = -1;
   char buf[64];
@@ -31,27 +39,33 @@ static void timer_cb(struct ev_loop *loop, ev_timer *w, int revents)
   if (write(fd, buf, len) != len) {
     fprintf(stderr, "cannot write to test file `%s': %s\n", path, strerror(errno));
     exit(1);
-  }
-  
-  close(fd); 
+  }  
+  close(fd);
+  ctr++;
 }
+
 
 int main()
 {
-
-  static struct ev_signal sig;
+  
+  ev_signal sig;
   ev_signal_init(&sig, signal_cb, SIGINT);
   ev_signal_start(EV_DEFAULT, &sig);
-
+ 
   ev_timer timer;
-  ev_timer_init(&timer, timer_cb, 0.0, 0.001);   
+  ev_timer_init(&timer, timer_cb, 300, 0);   
   ev_timer_start(EV_DEFAULT, &timer);
+  
+  ev_idle idle;
+  ev_idle_init(&idle, rw);
+  ev_idle_start(EV_DEFAULT, &idle);
 
   struct timespec times, timee;
   if (clock_gettime(CLOCK_REALTIME, &times) != 0) {
     fprintf(stderr, "cannot clock_gettime(): %m\n");
     goto _err;
   }
+  
   ev_run(EV_DEFAULT, 0);
 
   if (clock_gettime(CLOCK_REALTIME, &timee) != 0) {
